@@ -1,0 +1,138 @@
+      
+      #include <LiquidCrystal.h> // includes the LiquidCrystal Library
+      LiquidCrystal lcd(2, 3, 4, 5, 6, 7); // Creates an LCD object. Parameters: (rs, enable, d4, d5, d6, d7) 
+        #define DST_IP      "things.ubidots.com"
+        #define idvariable  "5ca1a6bcc03f970712d2656c"   // replace with your Ubidots Variable ID
+        #define token       "A1E-fkvSGlb8r9Vp3yBGT1amcuYuPjnA9L"  // replace with your Ubidots token
+     
+          const int trigPin = 9;
+          const int echoPin = 10;
+          const int buz = 8;
+          long duration;
+          int distanceCm, distanceInch;
+    
+        int len,value,i;
+      //final code   rx,tx=0,1
+        void setup()
+        {
+          // Open serial communications and wait for port to open:
+          char cmd[254];       // MAX LENGTH
+          lcd.begin(16,2); // Initializes the interface to the LCD screen, and specifies the dimensions (width and height) of the display
+          pinMode(trigPin, OUTPUT);
+          pinMode(echoPin, INPUT);
+           pinMode(buz, OUTPUT);
+          Serial.begin(9600);
+          Serial.setTimeout(5000);
+          lcd.setCursor(0,0); // Sets the location at which subsequent text written to the LCD will be displayed
+          lcd.print("start    ");
+          //test if the module is ready
+            delay(5000);
+            digitalWrite(buz, LOW);
+          Serial.println("AT+RST");
+          delay(4000);
+          Serial.println("AT");
+          delay(2000);
+           Serial.println("AT+CWJAP=\"123456789\",\"123456789\"");
+           delay(7000);
+          Serial.println("AT+CWMODE=1");
+          delay(4000);
+          Serial.println("AT+CIFSR");
+          delay(5000);
+          Serial.println("AT+CWMODE=3");
+          delay(3000);
+          Serial.println("AT+CIPMUX=0");
+           delay(3000);
+          }
+        
+        void loop()
+        {
+         digitalWrite(trigPin, LOW);
+          delayMicroseconds(2);
+          digitalWrite(trigPin, HIGH);
+          delayMicroseconds(10);
+          digitalWrite(trigPin, LOW);
+          duration = pulseIn(echoPin, HIGH);
+          distanceCm= duration*0.034/2;
+          distanceInch = duration*0.0133/2;
+          lcd.setCursor(0,0); // Sets the location at which subsequent text written to the LCD will be displayed
+          lcd.print("Distance: "); // Prints string "Distance" on the LCD
+          lcd.print(distanceCm); // Prints the distance value from the sensor
+          lcd.print(" cm");
+       
+          delay(100);
+          if(distanceCm>0  && distanceCm<10)
+          {
+            for(i=0;i<15;i++)
+            {
+            digitalWrite(buz, HIGH);
+            delay(300);
+            digitalWrite(buz, LOW);
+            delay(200);
+            }
+          }
+          if(distanceCm>0  && distanceCm<50)
+          {
+     
+        
+            value=distanceCm;
+            value=value*2;
+          int num=0;
+          String var = "{\"value\":"+ String(value) + "}";
+          num = var.length();
+          String cmd = "AT+CIPSTART=\"TCP\",\"";
+          cmd += DST_IP;
+          cmd += "\",80";
+          Serial.println(cmd);
+          if (Serial.find("Error")) return;
+          
+          len=strlen ("POST /api/v1.6/datasources/");
+          len=len+strlen (idvariable);
+          len=len+strlen ("/values HTTP/1.1\nContent-Type: application/json\nContent-Length: ");
+          char numlenght[4]; // this will hold the length of num which is the length of the JSON element
+          sprintf(numlenght, "%d", num); // saw this clever code off the net; works yay
+          len=len+strlen (numlenght);
+          len=len + num; //fixed length of the string that will print as Content-Length: in the POST
+          len=len+strlen ("\nX-Auth-Token: ");
+          len=len+strlen (token);
+          len=len+strlen ("\nHost: things.ubidots.com\n\n");
+          len=len+strlen ("\n\n");
+          Serial.print("AT+CIPSEND=");
+          Serial.println (len); //lenght of the entire data POST for the CIPSEND command of ESP2866
+          //Serial.println(cmd.length());
+          if (Serial.find(">"))
+          {
+            //Serial.print(">");
+          } else
+          {
+            Serial.println("AT+CIPCLOSE");
+            delay(1000);
+            return;
+          }
+          Serial.print ("POST /api/v1.6/variables/");
+          Serial.print (idvariable);
+          Serial.print ("/values HTTP/1.1\nContent-Type: application/json\nContent-Length: ");
+          Serial.print (num);
+          Serial.print ("\nX-Auth-Token: ");
+          Serial.print (token);
+          Serial.print ("\nHost: things.ubidots.com\n\n");
+          Serial.print (var);
+          Serial.println ("\n\n");
+          delay(3000);
+          //Serial.find("+IPD"); clear the input buffer after the web site responds to the POST
+          while (Serial.available())
+          {
+            char c = Serial.read();
+          }
+         // Serial.println ("comleted 2");
+          delay(1000);
+
+          }
+          else
+          {
+            lcd.setCursor(0,0);
+          lcd.print("out of range   ");
+        
+          }
+        }
+     
+
